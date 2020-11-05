@@ -49,7 +49,7 @@ impl<'a> HubClientBuilder<'a> {
             None => options_work = std::ptr::null(),
         }
 
-        let mut result = HubClient::empty_client();
+        let mut result = HubClient::new_empty();
         let rc = unsafe { azsys::az_iot_hub_client_init(&mut result.inner, 
             get_span_from_str(&self.host_name.as_ref().unwrap()),
             get_span_from_str(&self.device_id.as_ref().unwrap()),
@@ -76,7 +76,7 @@ impl HubClient {
             None => options_work = std::ptr::null(),
         }
 
-        let mut client: HubClient = HubClient::empty_client();
+        let mut client: HubClient = HubClient::new_empty();
         let rc = unsafe { azsys::az_iot_hub_client_init(&mut client.inner, 
             get_span_from_str(host_name),
             get_span_from_str(device_id),
@@ -205,6 +205,18 @@ impl HubClient {
         AZ_IOT_HUB_CLIENT_C2D_SUBSCRIBE_TOPIC
     }
 
+    pub fn client_c2d_parse_received_topic(&self, topic: &str) -> Result<ClientC2DRequest, azsys::az_result> {
+        let mut result: ClientC2DRequest = ClientC2DRequest::new_empty();
+        let rc = unsafe { azsys::az_iot_hub_client_c2d_parse_received_topic (&self.inner, get_span_from_str(topic), &mut result.inner) };
+
+        if rc != azsys::az_result_core_AZ_OK {
+            Err(rc)
+        }
+        else {
+            Ok(result)
+        }
+    }
+
     pub fn get_client_method_subscribe_topic() -> &'static str {
         static AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC: &str = "$iothub/methods/POST/#";
         AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC
@@ -323,7 +335,7 @@ impl HubClient {
         rc
     }
 
-    pub fn empty_client() -> HubClient {
+    pub fn new_empty() -> HubClient {
         let client: HubClient = HubClient {
             inner: azsys::az_iot_hub_client {
                 _internal: azsys::az_iot_hub_client__bindgen_ty_1 {
@@ -357,7 +369,19 @@ pub struct MessageProperties {
 
 impl MessageProperties {
     pub fn new(buffer: Vec<u8>) -> Result<MessageProperties, azsys::az_result_core> {
-        let mut message_properties: MessageProperties = MessageProperties {
+        let mut message_properties = MessageProperties::new_empty();
+        let rc = unsafe { azsys::az_iot_message_properties_init(&mut message_properties.inner, get_span_from_vector(&buffer), 0) };
+
+        if rc != azsys::az_result_core_AZ_OK {
+            Err(rc)
+        }
+        else {
+            Ok(message_properties)
+        }
+    }
+
+    pub fn new_empty() -> MessageProperties {
+        let message_properties: MessageProperties = MessageProperties {
             inner: azsys::az_iot_message_properties {
                 _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
                     properties_buffer: get_empty_span(),
@@ -367,14 +391,7 @@ impl MessageProperties {
             }
         };
 
-        let rc = unsafe { azsys::az_iot_message_properties_init(&mut message_properties.inner, get_span_from_vector(&buffer), 0) };
-
-        if rc != azsys::az_result_core_AZ_OK {
-            Err(rc)
-        }
-        else {
-            Ok(message_properties)
-        }
+        message_properties
     }
 
     pub fn append(&mut self, k: &str, v: &str) -> Result<&mut MessageProperties, azsys::az_result_core> {
@@ -435,12 +452,48 @@ impl MessageProperties {
     }
 }
 
+pub struct ClientC2DRequest {
+    inner: azsys::az_iot_hub_client_c2d_request,
+}
+
+impl ClientC2DRequest {
+    pub fn new_empty() -> ClientC2DRequest {
+        let result: ClientC2DRequest = ClientC2DRequest {
+            inner: azsys::az_iot_hub_client_c2d_request {
+                properties: azsys::az_iot_message_properties {
+                    _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
+                        properties_buffer: get_empty_span(),
+                        properties_written: 0,
+                        current_property_index: 0,
+                    }
+                }
+            }
+        };
+
+        result
+    }
+
+    pub fn get_message_properties(&self) -> MessageProperties {
+        let result: MessageProperties = MessageProperties {
+            inner: azsys::az_iot_message_properties {
+                _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
+                    properties_buffer: self.inner.properties._internal.properties_buffer,
+                    properties_written: self.inner.properties._internal.properties_written,
+                    current_property_index: self.inner.properties._internal.current_property_index,
+                }
+            }
+        };
+
+        result
+    }
+}
+
 #[cfg(test)] 
 mod tests {
     use super::*;
     static HOST_NAME: &str = "testhost.azure-devices.net";
     static DEVICE_ID: &str = "test1";
-#[test]
+    #[test]
     fn client_init() {
         let client = HubClient::new(HOST_NAME, DEVICE_ID, Option::None).unwrap();
         let test: String = unsafe { String::from_raw_parts(
@@ -564,5 +617,13 @@ mod tests {
         let rc = client.ll_get_sas_password(100, sas, &mut out);
         assert_eq!(rc, azsys::az_result_core_AZ_OK);
         assert_eq!(out, password);
+    }
+    #[test]
+    fn client_get_c2d_subscribe_topic() {
+        assert_eq!(HubClient::get_client_c2d_subscribe_topic(), "devices/+/messages/devicebound/#");
+    }
+    #[test]
+    fn client_get_method_subscribe_topic() {
+        assert_eq!(HubClient::get_client_method_subscribe_topic(), "$iothub/methods/POST/#");
     }
 }
