@@ -7,5 +7,5 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-azure-embedded-sdk-sys = { path = "../azure-embedded-sdk-sys", rev = "c93ad77b9176e4e17f70edfef410b4a2333bb18f" }
-# azure-embedded-sdk-sys = { git = "https://github.com/markrad/azure-embedded-sdk-sys.git", tag = "v0.1.0"  }
+# azure-embedded-sdk-sys = { path = "../azure-embedded-sdk-sys" }
+azure-embedded-sdk-sys = { git = "https://github.com/markrad/azure-embedded-sdk-sys.git", rev = "c93ad77b9176e4e17f70edfef410b4a2333bb18f" }
