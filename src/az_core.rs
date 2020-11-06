@@ -1,5 +1,13 @@
 use azsys;
 
+pub fn precondition_failed_set_callback(callback: azsys::az_precondition_failed_fn) {
+    unsafe { azsys::az_precondition_failed_set_callback(callback) };
+}
+
+pub fn precondition_failed_get_callback() -> Option<unsafe extern "C" fn()> {
+    unsafe { azsys::az_precondition_failed_get_callback() }
+}
+
 pub fn get_span_from_str(s: &str) -> azsys::az_span {
     let result: azsys::az_span = azsys::az_span {
         _internal: azsys::az_span__bindgen_ty_1 {
@@ -54,3 +62,22 @@ impl az_span {
     }
 }
 */
+
+#[cfg(test)] 
+mod tests {
+    use super::*;
+    #[test]
+    fn set_callback() {
+        precondition_failed_set_callback(Option::Some(callback));
+    }
+    #[test]
+    fn get_callback() {
+        precondition_failed_set_callback(Option::Some(callback));
+        let check: azsys::az_precondition_failed_fn = precondition_failed_get_callback();
+        assert!(check.is_some());
+    }
+
+    unsafe extern "C" fn callback() {
+        panic!();
+    }
+}
