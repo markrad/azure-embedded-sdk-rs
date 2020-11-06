@@ -291,7 +291,7 @@ impl HubClient {
     }
 
     pub fn get_sas_password(&self, ttl: u64, sas: &str) -> Result<String, azsys::az_result> {
-        let mut capacity: usize = 100;
+        let mut capacity: usize = 300;
         let mut result = String::with_capacity(capacity);
 
         loop {
