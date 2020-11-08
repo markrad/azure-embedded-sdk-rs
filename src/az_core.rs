@@ -44,6 +44,10 @@ pub fn get_empty_span() -> azsys::az_span {
 pub fn get_span_size(span: &azsys::az_span) -> i32 {
     span._internal.size
 }
+
+pub fn get_span_ptr(span: &azsys::az_span) -> *mut u8 {
+    span._internal.ptr
+}
 /*
 pub struct az_span {
     inner: azsys::az_span;

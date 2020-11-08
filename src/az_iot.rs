@@ -176,12 +176,56 @@ impl HubClient {
         rc
     }
 
-    pub fn get_client_telemetry_publish_topic(&self, message_properties: Option<MessageProperties>) -> Result<String, azsys::az_result> {
+    pub fn get_c2d_subscribe_topic() -> &'static str {
+        static AZ_IOT_HUB_CLIENT_C2D_SUBSCRIBE_TOPIC: &str = "devices/+/messages/devicebound/#";
+        AZ_IOT_HUB_CLIENT_C2D_SUBSCRIBE_TOPIC
+    }
+
+    pub fn c2d_parse_received_topic(&self, topic: &str) -> Result<ClientC2DRequest, azsys::az_result> {
+        let mut result: ClientC2DRequest = ClientC2DRequest::new_empty();
+        let rc = unsafe { azsys::az_iot_hub_client_c2d_parse_received_topic(&self.inner, get_span_from_str(topic), &mut result.inner) };
+
+        if rc != azsys::az_result_core_AZ_OK {
+            Err(rc)
+        }
+        else {
+            Ok(result)
+        }
+    }
+
+    pub fn get_method_subscribe_topic() -> &'static str {
+        static AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC: &str = "$iothub/methods/POST/#";
+        AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC
+    }
+
+    pub fn methods_parse_received_topic(&self, topic: &str) -> Result<ClientMethodRequest, azsys::az_result> {
+        let mut result: ClientMethodRequest = ClientMethodRequest::new_empty();
+        let rc = unsafe { azsys::az_iot_hub_client_methods_parse_received_topic(&self.inner, get_span_from_str(topic), &mut result.inner) };
+
+        if rc != azsys::az_result_core_AZ_OK {
+            Err(rc)
+        }
+        else {
+            Ok(result)
+        }
+    }
+
+    pub fn get_twin_respnse_subscribe_topic() -> &'static str {
+        static AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC: &str = "$iothub/twin/res/#";
+        AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC
+    }
+
+    pub fn get_twin_patch_subscribe_topic() -> &'static str {
+        static AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC : &str = "$iothub/twin/PATCH/properties/desired/#";
+        AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC
+    }
+
+    pub fn get_telemetry_publish_topic(&self, message_properties: Option<MessageProperties>) -> Result<String, azsys::az_result> {
         let mut capacity: usize = 100;
         let mut result = String::with_capacity(capacity);
 
         loop {
-            let rc = self.ll_get_client_telemetry_publish_topic(&message_properties, &mut result);
+            let rc = self.ll_get_telemetry_publish_topic(&message_properties, &mut result);
 
             match rc {
                 azsys::az_result_core_AZ_ERROR_NOT_ENOUGH_SPACE => {
@@ -200,39 +244,7 @@ impl HubClient {
         }
     }
 
-    pub fn get_client_c2d_subscribe_topic() -> &'static str {
-        static AZ_IOT_HUB_CLIENT_C2D_SUBSCRIBE_TOPIC: &str = "devices/+/messages/devicebound/#";
-        AZ_IOT_HUB_CLIENT_C2D_SUBSCRIBE_TOPIC
-    }
-
-    pub fn client_c2d_parse_received_topic(&self, topic: &str) -> Result<ClientC2DRequest, azsys::az_result> {
-        let mut result: ClientC2DRequest = ClientC2DRequest::new_empty();
-        let rc = unsafe { azsys::az_iot_hub_client_c2d_parse_received_topic (&self.inner, get_span_from_str(topic), &mut result.inner) };
-
-        if rc != azsys::az_result_core_AZ_OK {
-            Err(rc)
-        }
-        else {
-            Ok(result)
-        }
-    }
-
-    pub fn get_client_method_subscribe_topic() -> &'static str {
-        static AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC: &str = "$iothub/methods/POST/#";
-        AZ_IOT_HUB_CLIENT_METHODS_SUBSCRIBE_TOPIC
-    }
-
-    pub fn get_client_twin_respnse_subscribe_topic() -> &'static str {
-        static AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC: &str = "$iothub/twin/res/#";
-        AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC
-    }
-
-    pub fn get_client_twin_patch_subscribe_topic() -> &'static str {
-        static AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC : &str = "$iothub/twin/PATCH/properties/desired/#";
-        AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC
-    }
-
-    pub fn ll_get_client_telemetry_publish_topic(&self, message_properties: &Option<MessageProperties>, result: &mut String) -> azsys::az_result {
+    pub fn ll_get_telemetry_publish_topic(&self, message_properties: &Option<MessageProperties>, result: &mut String) -> azsys::az_result {
         let mut len: u64 = 0;
         let len_ptr: *mut u64 = &mut len;
         let m_prop_work: *const azsys::az_iot_message_properties = match message_properties {
@@ -485,6 +497,31 @@ impl ClientC2DRequest {
         };
 
         result
+    }
+}
+
+pub struct ClientMethodRequest {
+    inner:azsys::az_iot_hub_client_method_request,
+}
+
+impl ClientMethodRequest {
+    pub fn new_empty() -> ClientMethodRequest {
+        ClientMethodRequest {
+            inner: azsys::az_iot_hub_client_method_request {
+                request_id: get_empty_span(),
+                name: get_empty_span(),
+            }
+        }
+    }
+
+    pub fn get_request_id(&self) -> &str {
+        let slice = unsafe { slice::from_raw_parts(get_span_ptr(&self.inner.request_id), get_span_size(&self.inner.request_id) as usize) };
+        str::from_utf8(&slice).expect("Request Id contains unprintable characters")
+    }
+
+    pub fn get_name(&self) -> &str {
+        let slice = unsafe { slice::from_raw_parts(get_span_ptr(&self.inner.name), get_span_size(&self.inner.name) as usize) };
+        str::from_utf8(&slice).expect("Request Id contains unprintable characters")
     }
 }
 
