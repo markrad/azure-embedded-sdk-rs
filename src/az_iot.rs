@@ -242,6 +242,50 @@ impl HubClient {
         }
     }
 
+    pub fn methods_response_get_publish_topic(&self, request_id: &str, status: u16) -> Result<String, AzReturnCode> {
+        let mut capacity: usize = 100;
+        let mut result = String::with_capacity(capacity);
+
+        loop {
+            let rc = self.ll_methods_response_get_publish_topic(&request_id, status, &mut result);
+
+            match rc {
+                AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
+                    capacity *= 2;
+                    result = String::with_capacity(capacity);
+                    continue;
+                }
+                AzReturnCode::AzResultCoreOk => {
+                    result.shrink_to_fit();
+                    return Ok(result);
+                }
+                _ => {
+                    return Err(rc);
+                }
+            }
+        }
+    }
+
+    pub fn ll_methods_response_get_publish_topic(&self, request_id: &str, status: u16, result: &mut String) -> AzReturnCode {
+        let request_id_span = get_span_from_str(request_id);
+        let mut len: u64 = 0;
+        let len_ptr: *mut u64 = &mut len;
+        let rc = unsafe { azsys::az_iot_hub_client_methods_response_get_publish_topic(
+            &self.inner, 
+            request_id_span, 
+            status,                 
+            result.as_mut_vec().as_mut_ptr() as *mut i8,
+            result.capacity() as u64,
+            len_ptr,
+        ) };
+
+        if rc == azsys::az_result_core_AZ_OK {
+            unsafe { result.as_mut_vec().set_len(len as usize) };
+        }
+
+        AzReturnCode::from_i32(rc)
+    }
+
     pub fn get_twin_respnse_subscribe_topic() -> &'static str {
         static AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC: &str = "$iothub/twin/res/#";
         AZ_IOT_HUB_CLIENT_TWIN_RESPONSE_SUBSCRIBE_TOPIC
