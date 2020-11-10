@@ -71,6 +71,12 @@ impl<'a> HubClientBuilder<'a> {
     }
 }
 
+pub enum TopicType {
+    C2D(ClientC2DRequest),
+    Method(ClientMethodRequest),
+    Unknown,
+}
+
 impl HubClient {
     pub fn new(
         host_name: &str,
@@ -245,6 +251,28 @@ impl HubClient {
         static AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC: &str =
             "$iothub/twin/PATCH/properties/desired/#";
         AZ_IOT_HUB_CLIENT_TWIN_PATCH_SUBSCRIBE_TOPIC
+    }
+
+    pub fn get_topic_type(&self, topic: &str) -> Result<TopicType, AzReturnCode> {
+        match self.c2d_parse_received_topic(topic) {
+            Ok(val) =>  { return Ok(TopicType::C2D(val)); },
+            Err(rc) => {
+                if rc != AzReturnCode::AzResultIoTErrorTopicNoMatch {
+                    return Err(rc);
+                }
+            },
+        }
+
+        match self.methods_parse_received_topic(topic) {
+            Ok(val) => { return Ok(TopicType::Method(val)); },
+            Err(rc) => {
+                if rc != AzReturnCode::AzResultIoTErrorTopicNoMatch {
+                    return Err(rc);
+                }
+            },
+        }
+
+        Ok(TopicType::Unknown)
     }
 
     pub fn get_telemetry_publish_topic(
