@@ -107,6 +107,18 @@ impl HubClient {
         }
     }
 
+    pub fn new_empty() -> HubClient {
+        HubClient {
+            inner: azsys::az_iot_hub_client {
+                _internal: azsys::az_iot_hub_client__bindgen_ty_1 {
+                    iot_hub_hostname: get_empty_span(),
+                    device_id: get_empty_span(),
+                    options: HubClientOptions::default_new().inner,
+                },
+            },
+        }
+    }
+
     pub fn get_client_id(&self) -> Result<String, AzReturnCode> {
         let mut capacity: usize = 100;
         let mut result = String::with_capacity(capacity);
@@ -459,18 +471,14 @@ impl HubClient {
         AzReturnCode::from_i32(rc)
     }
 
-    pub fn new_empty() -> HubClient {
-        let client: HubClient = HubClient {
-            inner: azsys::az_iot_hub_client {
-                _internal: azsys::az_iot_hub_client__bindgen_ty_1 {
-                    iot_hub_hostname: get_empty_span(),
-                    device_id: get_empty_span(),
-                    options: HubClientOptions::default_new().inner,
-                },
-            },
-        };
-
-        client
+    pub fn calculate_retry_delay(
+        operation_msec: i32, 
+        attempt: i16, 
+        min_retry_delay_msec: i32,
+        max_retry_delay_msec: i32,
+        jitter: i32,
+    ) -> i32 {
+        unsafe { azsys::az_iot_calculate_retry_delay(operation_msec, attempt, min_retry_delay_msec, max_retry_delay_msec, jitter) }
     }
 }
 
