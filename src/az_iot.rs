@@ -79,7 +79,7 @@ pub enum TopicType {
 }
 
 impl HubClient {
-    pub const DEFAULT_MQTT_CONNECT_PORT: u32 = azsys::AZ_IOT_DEFAULT_MQTT_CONNECT_PORT;
+    pub const DEFAULT_MQTT_CONNECT_PORT: u32 = azsys::AZ_IOT_DEFAULT_MQTT_CONNECT_PORT as u32;
     pub fn new(
         host_name: &str,
         device_id: &str,
