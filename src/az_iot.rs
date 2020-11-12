@@ -78,6 +78,11 @@ pub enum TopicType {
     Unknown,
 }
 
+fn capacity_increase_policy(current: usize) -> usize {
+    let result = current + (current / 50);
+    result
+}
+
 impl HubClient {
     pub const DEFAULT_MQTT_CONNECT_PORT: u32 = azsys::AZ_IOT_DEFAULT_MQTT_CONNECT_PORT as u32;
     pub fn new(
@@ -130,7 +135,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = String::with_capacity(capacity);
                     continue;
                 }
@@ -174,7 +179,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = String::with_capacity(capacity);
                     continue;
                 }
@@ -265,7 +270,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = String::with_capacity(capacity);
                     continue;
                 }
@@ -345,7 +350,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = String::with_capacity(capacity);
                     continue;
                 }
@@ -397,7 +402,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = Vec::with_capacity(capacity);
                     continue;
                 }
@@ -435,7 +440,7 @@ impl HubClient {
 
             match rc {
                 AzReturnCode::AzResultCoreErrorNotEnoughSpace => {
-                    capacity *= 2;
+                    capacity = capacity_increase_policy(capacity);
                     result = String::with_capacity(capacity);
                     continue;
                 }
@@ -496,18 +501,51 @@ impl HubClientOptions {
     }
 }
 
+pub struct MessagePropertiesBuilder {
+    props: Vec<u8>,
+}
+
+impl MessagePropertiesBuilder {
+    pub fn new() -> MessagePropertiesBuilder {
+        MessagePropertiesBuilder::with_capacity(200)
+    }
+
+    pub fn with_capacity(capacity: usize) -> MessagePropertiesBuilder {
+        MessagePropertiesBuilder {
+            props: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn add(mut self, keyword: &str, value: &str) -> MessagePropertiesBuilder {
+        if self.props.len() != 0 {
+            self.props.push('&' as u8);
+        }
+
+        self.props.append(&mut keyword.as_bytes().to_vec().as_mut_slice().to_vec());
+        self.props.push('=' as u8);
+        self.props.append(&mut value.as_bytes().to_vec().as_mut_slice().to_vec());
+        self
+    }
+
+    pub fn finialize(self) -> Result<MessageProperties, AzReturnCode> {
+        let len = self.props.len() as i32;
+        MessageProperties::new(self.props, len)
+    }
+}
+
 pub struct MessageProperties {
+    props: Vec<u8>,
     inner: azsys::az_iot_message_properties,
 }
 
 impl MessageProperties {
-    pub fn new(buffer: Vec<u8>) -> Result<MessageProperties, AzReturnCode> {
-        let mut message_properties = MessageProperties::new_empty();
+    pub fn new(buffer: Vec<u8>, written_length: i32) -> Result<MessageProperties, AzReturnCode> {
+        let mut message_properties = MessageProperties::new_empty(buffer);
         let rc = unsafe {
             azsys::az_iot_message_properties_init(
                 &mut message_properties.inner,
-                get_span_from_vector(&buffer),
-                0,
+                message_properties.get_props_span(),
+                written_length,
             )
         };
 
@@ -518,8 +556,9 @@ impl MessageProperties {
         }
     }
 
-    pub fn new_empty() -> MessageProperties {
+    pub fn new_empty(buffer: Vec<u8>) -> MessageProperties {
         let message_properties: MessageProperties = MessageProperties {
+            props: buffer,
             inner: azsys::az_iot_message_properties {
                 _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
                     properties_buffer: get_empty_span(),
@@ -595,15 +634,26 @@ impl MessageProperties {
 
         Ok(out)
     }
+
+    fn get_props_span(&self) -> azsys::az_span {
+        get_span_from_vector(&self.props)
+    }
+
+    pub(crate) fn get_inner(&self) -> azsys::az_iot_message_properties {
+        self.inner
+    }
 }
 
 pub struct ClientC2DRequest {
+    message_props: MessageProperties,
     inner: azsys::az_iot_hub_client_c2d_request,
 }
 
 impl ClientC2DRequest {
     pub fn new_empty() -> ClientC2DRequest {
-        let result: ClientC2DRequest = ClientC2DRequest {
+        let null_vec: Vec<u8> = Vec::new();
+        ClientC2DRequest {
+            message_props: MessageProperties::new(null_vec, 0).unwrap(),
             inner: azsys::az_iot_hub_client_c2d_request {
                 properties: azsys::az_iot_message_properties {
                     _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
@@ -613,13 +663,30 @@ impl ClientC2DRequest {
                     },
                 },
             },
+        }
+    }
+
+    pub fn from_message_properties(props: MessageProperties) -> ClientC2DRequest {
+        let mut result = ClientC2DRequest {
+            message_props: props,
+            inner: azsys::az_iot_hub_client_c2d_request {
+                properties: azsys::az_iot_message_properties {
+                    _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
+                        properties_buffer: get_empty_span(),
+                        properties_written: 0,
+                        current_property_index: 0,
+                    },
+                },
+            }
         };
 
+        result.inner.properties = result.message_props.get_inner();
         result
     }
 
     pub fn get_message_properties(&self) -> MessageProperties {
-        let result: MessageProperties = MessageProperties {
+        MessageProperties {
+            props: Vec::new(),
             inner: azsys::az_iot_message_properties {
                 _internal: azsys::az_iot_message_properties__bindgen_ty_1 {
                     properties_buffer: self.inner.properties._internal.properties_buffer,
@@ -627,9 +694,7 @@ impl ClientC2DRequest {
                     current_property_index: self.inner.properties._internal.current_property_index,
                 },
             },
-        };
-
-        result
+        }
     }
 }
 
@@ -842,5 +907,46 @@ mod tests {
             HubClient::get_method_subscribe_topic(),
             "$iothub/methods/POST/#"
         );
+    }
+    #[test]
+    fn test_message_properties() {
+        let buf: Vec<u8> = Vec::with_capacity(200);
+        let mut mp = MessageProperties::new(buf, 0).unwrap();
+        mp.append("LastName", "Thomas").unwrap();
+        mp.append("MiddleName", "Richard").unwrap();
+        mp.append("FirstName", "Harold").unwrap();
+        assert_eq!(Ok("Richard"), mp.find("MiddleName"));
+        assert_eq!(Ok("Harold"), mp.find("FirstName"));
+        assert_eq!(Ok("Thomas"), mp.find("LastName"));
+        // Pending bug fix in azure-sdk-for-c
+        // let out = mp.into_array().unwrap();
+        // assert_eq!(out.len(), 3);
+    }
+    #[test]
+    fn test_message_properties_builder() {
+        let mut mp = MessagePropertiesBuilder::new()
+            .add("LastName", "Thomas")
+            .add("MiddleName", "Richard")
+            .add("FirstName", "Harold")
+            .finialize().unwrap();
+        assert_eq!(Ok("Richard"), mp.find("MiddleName"));
+        assert_eq!(Ok("Harold"), mp.find("FirstName"));
+        assert_eq!(Ok("Thomas"), mp.find("LastName"));
+        // Pending bug fix in azure-sdk-for-c
+        // let out = mp.into_array().unwrap();
+        // assert_eq!(out.len(), 3);
+    }
+    #[test]
+    fn test_c2d_request() {
+        let mp = MessagePropertiesBuilder::new()
+            .add("LastName", "Thomas")
+            .add("MiddleName", "Richard")
+            .add("FirstName", "Harold")
+            .finialize().unwrap();
+        let req = ClientC2DRequest::from_message_properties(mp);
+        let mut mp2 = req.get_message_properties();
+        assert_eq!(Ok("Richard"), mp2.find("MiddleName"));
+        assert_eq!(Ok("Harold"), mp2.find("FirstName"));
+        assert_eq!(Ok("Thomas"), mp2.find("LastName"));
     }
 }
