@@ -811,19 +811,13 @@ mod tests {
     #[test]
     fn client_get_user_name() {
         let client = HubClient::new(HOST_NAME, DEVICE_ID, Option::None).unwrap();
-        let user_name = HOST_NAME.to_string()
-            + "/"
-            + DEVICE_ID
-            + "/?api-version=2018-06-30&DeviceClientType=c%2F1.0.0";
+        let user_name = format!("{}/{}/?api-version=2020-09-30&DeviceClientType=c%2F1.1.0-beta.2", HOST_NAME, DEVICE_ID);
         assert_eq!(user_name, client.get_user_name().unwrap());
     }
     #[test]
     fn client_ll_get_user_name() {
         let client = HubClient::new(HOST_NAME, DEVICE_ID, Option::None).unwrap();
-        let user_name = HOST_NAME.to_string()
-            + "/"
-            + DEVICE_ID
-            + "/?api-version=2018-06-30&DeviceClientType=c%2F1.0.0";
+        let user_name = format!("{}/{}/?api-version=2020-09-30&DeviceClientType=c%2F1.1.0-beta.2", HOST_NAME, DEVICE_ID);
         let mut out: String = String::with_capacity(200);
         let rc = client.ll_get_user_name(&mut out);
         assert_eq!(rc, AzReturnCode::AzResultCoreOk);
@@ -919,8 +913,17 @@ mod tests {
         assert_eq!(Ok("Harold"), mp.find("FirstName"));
         assert_eq!(Ok("Thomas"), mp.find("LastName"));
         // Pending bug fix in azure-sdk-for-c
-        // let out = mp.into_array().unwrap();
-        // assert_eq!(out.len(), 3);
+        let out = mp.into_array().unwrap();
+        assert_eq!(out.len(), 3);
+        
+        for val in out {
+            match val.0 {
+                "LastName" => assert_eq!(val.1, "Thomas"),
+                "MiddleName" => assert_eq!(val.1, "Richard"),
+                "FirstName" => assert_eq!(val.1, "Harold"),
+                _ => assert!(false),
+            }
+        }
     }
     #[test]
     fn test_message_properties_builder() {
@@ -932,9 +935,18 @@ mod tests {
         assert_eq!(Ok("Richard"), mp.find("MiddleName"));
         assert_eq!(Ok("Harold"), mp.find("FirstName"));
         assert_eq!(Ok("Thomas"), mp.find("LastName"));
-        // Pending bug fix in azure-sdk-for-c
-        // let out = mp.into_array().unwrap();
-        // assert_eq!(out.len(), 3);
+        // Pending bug fix in azure-sdk-for-c 
+        let out = mp.into_array().unwrap();
+        assert_eq!(out.len(), 3);
+        
+        for val in out {
+            match val.0 {
+                "LastName" => assert_eq!(val.1, "Thomas"),
+                "MiddleName" => assert_eq!(val.1, "Richard"),
+                "FirstName" => assert_eq!(val.1, "Harold"),
+                _ => assert!(false),
+            }
+        }
     }
     #[test]
     fn test_c2d_request() {
